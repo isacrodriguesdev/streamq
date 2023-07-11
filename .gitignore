@@ -1,0 +1,6 @@
+node_modules/
+dist/
+lib/
+index.js
+index.js.map
+test.ts
