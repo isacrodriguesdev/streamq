@@ -37,8 +37,8 @@ export class StreamQ implements StreamQInstance {
       config.pollingInterval = 0; // 0ms
     }
 
-    if (!config.deleteAfterProcessing) {
-      config.deleteAfterProcessing = false;
+    if (!config.deleteAfterReading) {
+      config.deleteAfterReading = false;
     }
 
     StreamQ.config.set(event, config);
@@ -63,7 +63,7 @@ export class StreamQ implements StreamQInstance {
     const config = StreamQ.config.get(event);
     const offset = StreamQ.offset.get(event);
 
-    if (config.deleteAfterProcessing) {
+    if (config.deleteAfterReading) {
       return this.logger.notify(["console"], {
         level: "error",
         message: "Cannot set read offset on a stream that deletes messages after processing",
@@ -113,7 +113,7 @@ export class StreamQ implements StreamQInstance {
 
       const config = StreamQ.config.get(event);
 
-      if (config.deleteAfterProcessing) {
+      if (config.deleteAfterReading) {
         this.persist.removeMessage(event, nextOffset);
       }
 

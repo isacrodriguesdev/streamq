@@ -7,7 +7,7 @@ export abstract declare class StreamQMessage {
 export declare interface StreamQMessageConfig {
   pollingInterval?: number;
   retentionTime?: number;
-  deleteAfterProcessing?: boolean;
+  deleteAfterReading?: boolean;
 }
 
 export declare class StreamQInstance {

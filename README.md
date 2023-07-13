@@ -53,9 +53,9 @@ default: 0
 The retentionTime option sets the duration, in minutes, for which message data is retained in the queue before automatic removal. It controls how long the data persists in the queue before being deleted.
 default: 10080 (7 days)
 
-`deleteAfterProcessing`
+`deleteAfterReading`
 
-The deleteAfterProcessing option, when enabled, automatically removes processed messages from the queue. Once a message has been successfully processed, it is deleted, ensuring a clean and efficient queue.
+The deleteAfterReading option, when enabled, automatically removes processed messages from the queue. Once a message has been successfully processed, it is deleted, ensuring a clean and efficient queue.
 default: false
 
 ```typescript
