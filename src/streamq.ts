@@ -1,122 +1,191 @@
-import { MessageQ, IEventConfig, IPersist, IStreamQ } from "../src/types";
+import { ILogger, Logger } from "@isacrodriguesdev/logger";
+import { StreamQInstance, StreamQMessageConfig, StreamQMessage, StreamQPersist } from "./types";
 
-export class StreamQ implements IStreamQ {
+export class StreamQ implements StreamQInstance {
   private static listeners: Map<string, NodeJS.Timer> = new Map();
   private static proccessing: Map<string, boolean> = new Map();
-  private static config: Map<string, IEventConfig> = new Map();
-  private static onEventCallbacks: Map<string, (message: MessageQ) => Promise<void>> = new Map();
+  private static config: Map<string, StreamQMessageConfig> = new Map();
+  private static onEventCallbacks: Map<string, (message: StreamQMessage) => Promise<void>> = new Map();
   private static nextOffset: Map<string, number> = new Map();
-  private static currentOffset: Map<string, number> = new Map();
+  private static offset: Map<string, number> = new Map();
+  private static paused: Map<string, boolean> = new Map();
+  private readonly logger: ILogger = new Logger();
 
-  constructor(private readonly persist: IPersist) {}
+  constructor(private readonly persist: StreamQPersist) {}
 
-  public onEvent(eventName: string, callback: (message: MessageQ) => Promise<void>): void {
-    StreamQ.onEventCallbacks.set(eventName, callback);
+  public on(event: string, callback: (message: StreamQMessage) => Promise<void>): void {
+    StreamQ.onEventCallbacks.set(event, callback);
   }
 
-  public async emit(eventName: string, values: any[]): Promise<void> {
-    let currentOffset = StreamQ.currentOffset.get(eventName);
+  public async emit(event: string, values: any[]): Promise<void> {
+    let offset = StreamQ.offset.get(event);
 
     for (const value of values) {
-      currentOffset++;
-      StreamQ.currentOffset.set(eventName, currentOffset);
-      await this.persist.addMessage(
-        eventName,
-        currentOffset,
-        typeof value === "object" ? JSON.stringify(value) : value
-      );
+      offset++;
+      await this.addMessage(event, offset, value);
     }
 
-    const listener = StreamQ.listeners.get(eventName);
-    if (!listener) {
-      this.startListener(eventName);
+    this.checkIfListenerShouldStart(event);
+  }
+
+  public async register(event: string, config: StreamQMessageConfig): Promise<void> {
+    if (!config.retentionTime) {
+      config.retentionTime = 10080; // 7 dias
     }
+
+    if (!config.pollingInterval) {
+      config.pollingInterval = 0; // 0ms
+    }
+
+    if (!config.deleteAfterProcessing) {
+      config.deleteAfterProcessing = false;
+    }
+
+    StreamQ.config.set(event, config);
+    await this.iniatilize(event);
   }
 
-  public async register(eventName: string, eventConfig: IEventConfig): Promise<void> {
-    StreamQ.config.set(eventName, eventConfig);
-
-    await this.persist.createOffsetsIfNotExists(eventName);
-    this.iniatilize(eventName);
-  }
-
-  private startListener(eventName: string): void {
-    const config = StreamQ.config.get(eventName);
-
-    const intervalId = setInterval(() => {
-      const processing = StreamQ.proccessing.get(eventName);
-      if (!processing) {
-        this.nextProcess(eventName);
-      }
-    }, config.delayBetweenUpdates);
-
-    StreamQ.listeners.set(eventName, intervalId);
-  }
-
-  private stopListener(eventName: string): void {
-    const intervalId = StreamQ.listeners.get(eventName);
-    if (intervalId) {
-      clearInterval(intervalId);
-      StreamQ.listeners.delete(eventName);
+  public resume(event: string): void {
+    if (StreamQ.paused.get(event)) {
+      StreamQ.paused.set(event, false);
+      this.startListener(event);
     }
   }
 
-  private async nextProcess(eventName: string): Promise<void> {
-    this.setProcessing(eventName, true);
+  public pause(event: string): void {
+    if (!StreamQ.paused.get(event)) {
+      StreamQ.paused.set(event, true);
+      this.stopListener(event);
+    }
+  }
 
-    let nextOffset = this.getNextOffset(eventName);
-    let currentOffset = this.getCurrentOffset(eventName);
+  public setReadOffset(event: string, startingOffset: number): void {
+    const config = StreamQ.config.get(event);
+    const offset = StreamQ.offset.get(event);
 
-    if (nextOffset <= currentOffset) {
-      const message = await this.persist.getMessage(eventName, nextOffset);
+    if (config.deleteAfterProcessing) {
+      return this.logger.notify(["console"], {
+        level: "error",
+        message: "Cannot set read offset on a stream that deletes messages after processing",
+        additionalInfo: { event, method: "setReadOffset" },
+      });
+    }
+
+    if (startingOffset < offset) {
+      StreamQ.nextOffset.set(event, startingOffset);
+    } else {
+      this.logger.notify(["console"], {
+        level: "error",
+        message: "Starting offset is greater than last offset",
+        additionalInfo: { event, offset: startingOffset, method: "setReadOffset" },
+      });
+    }
+  }
+
+  private checkIfListenerShouldStart(event: string) {
+    const listener = StreamQ.listeners.get(event);
+    const paused = StreamQ.paused.get(event);
+
+    if (!listener && paused === false) {
+      this.startListener(event);
+    }
+  }
+
+  private async nextProcess(event: string): Promise<void> {
+    this.setProcessing(event, true);
+
+    let nextOffset = this.getNextOffset(event);
+    let offset = this.getOffset(event);
+
+    if (nextOffset <= offset) {
+      const message = await this.persist.getMessage(event, nextOffset);
 
       if (!message) {
-        await this.setNext(eventName);
-        this.setProcessing(eventName, false);
+        await this.setNext(event);
+        this.setProcessing(event, false);
         return;
       }
 
-      const callback = StreamQ.onEventCallbacks.get(eventName);
+      const callback = StreamQ.onEventCallbacks.get(event);
       if (callback) {
         await callback(message);
       }
 
-      await this.persist.removeMessage(eventName, nextOffset);
-      await this.setNext(eventName);
-      this.setProcessing(eventName, false);
+      const config = StreamQ.config.get(event);
+
+      if (config.deleteAfterProcessing) {
+        this.persist.removeMessage(event, nextOffset);
+      }
+
+      await this.setNext(event);
+      this.setProcessing(event, false);
     } else {
-      this.stopListener(eventName);
-      this.setProcessing(eventName, false);
+      this.stopListener(event);
+      this.setProcessing(event, false);
     }
   }
 
-  private setProcessing(eventName: string, processing: boolean): void {
-    StreamQ.proccessing.set(eventName, processing);
+  private async addMessage(event: string, offset: number, value: any): Promise<void> {
+    const config = StreamQ.config.get(event);
+    StreamQ.offset.set(event, offset);
+    await this.persist.addMessage(
+      event,
+      offset,
+      typeof value === "object" ? JSON.stringify(value) : value,
+      config.retentionTime
+    );
+    await this.persist.setOffset(event, offset);
   }
 
-  private async setNext(eventName: string): Promise<void> {
-    const nextOffset = StreamQ.nextOffset.get(eventName) + 1;
-    await this.persist.setNextOffset(eventName, nextOffset);
-    StreamQ.nextOffset.set(eventName, nextOffset);
+  private setProcessing(event: string, processing: boolean): void {
+    StreamQ.proccessing.set(event, processing);
   }
 
-  private getNextOffset(eventName: string): number {
-    return StreamQ.nextOffset.get(eventName);
+  private async setNext(event: string): Promise<void> {
+    const nextOffset = StreamQ.nextOffset.get(event) + 1;
+    await this.persist.setNextOffset(event, nextOffset);
+    StreamQ.nextOffset.set(event, nextOffset);
   }
 
-  private getCurrentOffset(eventName: string): number {
-    return StreamQ.currentOffset.get(eventName);
+  private getNextOffset(event: string): number {
+    return StreamQ.nextOffset.get(event);
   }
 
-  private async iniatilize(eventName: string): Promise<void> {
-    const nextOffset = await this.persist.getNextOffset(eventName);
-    const currentOffset = await this.persist.getCurrentOffset(eventName);
+  private getOffset(event: string): number {
+    return StreamQ.offset.get(event);
+  }
 
-    StreamQ.nextOffset.set(eventName, nextOffset);
-    StreamQ.currentOffset.set(eventName, currentOffset);
+  private startListener(event: string): void {
+    const config = StreamQ.config.get(event);
+    const intervalId = setInterval(() => {
+      const processing = StreamQ.proccessing.get(event);
+      if (!processing) {
+        this.nextProcess(event);
+      }
+    }, config.pollingInterval);
 
-    if (nextOffset <= currentOffset) {
-      this.startListener(eventName);
+    StreamQ.listeners.set(event, intervalId);
+  }
+
+  private stopListener(event: string): void {
+    const intervalId = StreamQ.listeners.get(event);
+    if (intervalId) {
+      clearInterval(intervalId);
+      StreamQ.listeners.delete(event);
+    }
+  }
+
+  private async iniatilize(event: string): Promise<void> {
+    StreamQ.paused.set(event, false);
+
+    const nextOffset = await this.persist.getNextOffset(event);
+    const offset = await this.persist.getOffset(event);
+
+    StreamQ.nextOffset.set(event, nextOffset);
+    StreamQ.offset.set(event, offset);
+
+    if (nextOffset <= offset) {
+      this.startListener(event);
     }
   }
 }
