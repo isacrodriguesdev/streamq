@@ -5,6 +5,7 @@
   "main": "lib/index.js",
   "scripts": {
     "start": "tsc && node lib/index.js",
+    "patch": "npm version patch",
     "publish": "tsc && npm publish --access public",
     "build": "node esbuild.js"
   },
