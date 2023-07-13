@@ -1,6 +1,6 @@
 {
   "name": "@isacrodriguesdev/streamq",
-  "version": "0.0.21",
+  "version": "1.0.21",
   "description": "StreamQ is a library for processing events and managing message queues.",
   "main": "lib/index.js",
   "scripts": {
@@ -29,6 +29,7 @@
     "event"
   ],
   "dependencies": {
+    "@isacrodriguesdev/logger": "^1.0.7",
     "ioredis": "^5.3.2"
   },
   "devDependencies": {
