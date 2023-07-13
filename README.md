@@ -32,7 +32,7 @@ const streamQ = new StreamQ(
   redisPersist({
     host: "localhost",
     port: 6379,
-    username: "myusername",
+    username: "yourusername",
     password: "yourpassword",
   })
 );
@@ -45,17 +45,17 @@ const streamq = new StreamQ(persist);
 
 `pollingInterval`
 
-This option represents the time interval, in milliseconds, between the operations of processing the message queue. By adjusting the value of `pollingInterval`, it is possible to control the processing rate of messages, directly affecting the time required to process each message.
+This option represents the time interval, in milliseconds, between the operations of processing the message queue. By adjusting the value of pollingInterval, it is possible to control the processing rate of messages, directly affecting the time required to process each message.
 default: 0
 
 `retentionTime`
 
-The `retentionTime` option sets the duration, in minutes, for which message data is retained in the queue before automatic removal. It controls how long the data persists in the queue before being deleted.
+The retentionTime option sets the duration, in minutes, for which message data is retained in the queue before automatic removal. It controls how long the data persists in the queue before being deleted.
 default: 10080 (7 days)
 
 `deleteAfterProcessing`
 
-The `deleteAfterProcessing` option, when enabled, automatically removes processed messages from the queue. Once a message has been successfully processed, it is deleted, ensuring a clean and efficient queue.
+The deleteAfterProcessing option, when enabled, automatically removes processed messages from the queue. Once a message has been successfully processed, it is deleted, ensuring a clean and efficient queue.
 default: false
 
 ```typescript
