@@ -1,26 +1,31 @@
-export declare interface MessageQ {
-  offset: number;
-  value: any;
+export abstract declare class StreamQMessage {
+  public offset: number;
+  public value: any;
+  public timestamp: number;
 }
 
-export declare interface IEventConfig {
-  delayBetweenUpdates: number;
+export declare interface StreamQMessageConfig {
+  pollingInterval?: number;
+  retentionTime?: number;
+  deleteAfterProcessing?: boolean;
 }
 
-export declare class IStreamQ {
-  constructor(persist: IPersist);
-  public onEvent(eventName: string, callback: (message: MessageQ) => Promise<void>): void;
-  public emit(eventName: string, values: any[]): Promise<void>;
-  public register(eventName: string, config: any): Promise<void>;
+export declare class StreamQInstance {
+  constructor(persist: StreamQPersist);
+  public on(event: string, callback: (message: StreamQMessage) => Promise<void>): void;
+  public resume(event: string): void;
+  public pause(event: string): void;
+  public setReadOffset(event: string, offset: number): void
+  public emit(event: string, values: any[]): Promise<void>;
+  public register(event: string, config: any): Promise<void>;
 }
 
-export declare class IPersist {
-  public createOffsetsIfNotExists(eventName: string): Promise<void>;
-  public getCurrentOffset(eventName: string): Promise<number>;
-  public getNextOffset(eventName: string): Promise<number>;
-  public setCurrentOffset(eventName: string, offset: number): Promise<void>;
-  public setNextOffset(eventName: string, offset: number): Promise<void>;
-  public getMessage(eventName: string, offset: number): Promise<any>;
-  public addMessage(eventName: string, offset: number, value: any): Promise<void>;
-  public removeMessage(eventName: string, offset: number): Promise<void>;
+export declare class StreamQPersist {
+  public getOffset(event: string): Promise<number>;
+  public getNextOffset(event: string): Promise<number>;
+  public setOffset(event: string, offset: number): Promise<void>;
+  public setNextOffset(event: string, offset: number): Promise<void>;
+  public getMessage(event: string, offset: number): Promise<any>;
+  public addMessage(event: string, offset: number, value: any, expiresIn: number): Promise<void>;
+  public removeMessage(event: string, offset: number): Promise<void>;
 }
