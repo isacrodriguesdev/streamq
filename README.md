@@ -27,6 +27,7 @@ Please note that StreamQ is currently in an experimental phase, undergoing activ
 ```typescript
 import { StreamQ, redisPersist } from "@isacrodriguesdev/streamq";
 
+  // Create an instance of StreamQ with a persistence implementation
 const streamQ = new StreamQ(
   // injecting the redis in the constructor
   redisPersist({
@@ -36,9 +37,6 @@ const streamQ = new StreamQ(
     password: "yourpassword",
   })
 );
-
-// Create an instance of StreamQ with a persistence implementation
-const streamq = new StreamQ(persist);
 ```
 
 #### Register an event with a configuration
