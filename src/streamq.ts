@@ -108,7 +108,11 @@ export class StreamQ implements StreamQInstance {
 
       const callback = StreamQ.onEventCallbacks.get(event);
       if (callback) {
-        await callback(message);
+        try {
+          await callback(message);
+        } catch (error) {
+          // TODO: handle error
+        }
       }
 
       const config = StreamQ.config.get(event);
