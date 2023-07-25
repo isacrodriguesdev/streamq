@@ -59,29 +59,6 @@ export class StreamQ implements StreamQInstance {
     }
   }
 
-  public setReadOffset(event: string, startingOffset: number): void {
-    const config = StreamQ.config.get(event);
-    const offset = StreamQ.offset.get(event);
-
-    if (config.deleteAfterReading) {
-      return this.logger.notify(["console"], {
-        level: "error",
-        message: "Cannot set read offset on a stream that deletes messages after processing",
-        additionalInfo: { event, method: "setReadOffset" },
-      });
-    }
-
-    if (startingOffset < offset) {
-      StreamQ.nextOffset.set(event, startingOffset);
-    } else {
-      this.logger.notify(["console"], {
-        level: "error",
-        message: "Starting offset is greater than last offset",
-        additionalInfo: { event, offset: startingOffset, method: "setReadOffset" },
-      });
-    }
-  }
-
   private checkIfListenerShouldStart(event: string) {
     const listener = StreamQ.listeners.get(event);
     const paused = StreamQ.paused.get(event);

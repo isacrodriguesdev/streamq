@@ -15,7 +15,6 @@ export declare class StreamQInstance {
   public on(event: string, callback: (message: StreamQMessage) => Promise<void>): void;
   public resume(event: string): void;
   public pause(event: string): void;
-  public setReadOffset(event: string, offset: number): void
   public emit(event: string, values: any[]): Promise<void>;
   public register(event: string, config: any): Promise<void>;
 }
