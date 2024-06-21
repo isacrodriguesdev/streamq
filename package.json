@@ -1,6 +1,6 @@
 {
   "name": "@isacrodriguesdev/streamq",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "StreamQ is a library for processing events and managing message queues.",
   "main": "lib/index.js",
   "scripts": {
